@@ -17,24 +17,15 @@ panda1 = rtb.models.Panda()
 panda2 = rtb.models.Panda()
 panda1.q = panda1.qr
 panda2.q = panda2.qr
-# panda1.gripper[0].q
-
+panda1.grippers[0].q = [0.01, 0.01]
+panda2.grippers[0].q = [0.01, 0.01]
+ 
 # Set robot position based on dimensions given in figure 3
 panda1.base = sm.SE3(0.5,0,0) * sm.SE3.Rz(np.pi)
 panda2.base = sm.SE3(-0.5,-0.1,0)
 
 env.add(panda1)
 env.add(panda2)
-
-# initialize rod
-# usage of sg.Cylinder() referenced https://www.gitlab.utcluj.ro/rcs/robotics-toolbox-python/-/blob/973f6e73b3e9bb39e59da1205cbf54e29035d2f9/roboticstoolbox/examples/fetch_vision.py
-rod = sg.Cylinder(
-    radius = 0.01,
-    length = 0.3,
-    base = sm.SE3(0,0,0)
-)
-rod.color = (0.8, 0, 0) # set rod to red color 
-env.add(rod)
 
 # callback funciton from the sliders in Swift which set 
 # the joint angles of the robot to the value of the sliders
@@ -63,17 +54,45 @@ for link in panda1.links:
         )
         j += 1
 
+# initialize rod parameters
+rod_radius = 0.01
+rod_length = 0.3
+
+rod_initialized = False # used to avoid error for env.remove(rod) when no rod has been initialized
+
 while True:
-    # Update the environment with the new robot pose
-    env.step(0)
+    if rod_initialized:
+        env.remove(rod)
 
     # Update the rod position based on the end effector current position
     # Reference: https://petercorke.github.io/robotics-toolbox-python/IK/ik.html#inverse-kinematics
     # get current position of end effector 
+    ee_pose1 = panda1.fkine(panda1.q)
+    ee_pose2 = panda2.fkine(panda2.q)
+    T = sm.SE3(0,0,0)
 
-    # update rod's position to pos of end effector 
-    # T = panda1.fkine(panda1.q) * sm.SE3.Tx(10) * sm.SE3.Ty(0.2) * sm.SE3.Tz(0.45)
+    # update the rod position based on the current end effector position
+    rod = sg.Cylinder(
+        radius = rod_radius,
+        length = rod_length,
+        pose = ee_pose1 * T
+    )
+    rod.color = (0.8, 0, 0)
+    rod_initialized = True
 
+    # set panda2 target to the far end of the rod
+    #target_pose2 = ee_pose1 * sm.SE3(0,0,0)
+
+    # solve inverse kinematics for panda2
+    #ik_solution = panda2.ikine_LM(target_pose2)
+
+    #if ik_solution.success:
+        #panda2.q = ik_solution.q
+
+    env.add(rod)
+
+    # Update the environment with the new robot pose
+    env.step(0)
     time.sleep(0.01)    
 
 
