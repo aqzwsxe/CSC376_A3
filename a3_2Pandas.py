@@ -60,26 +60,16 @@ rod_length = 0.3
 
 ee_pose1 = panda1.fkine(panda1.q)
 ee_pose2 = panda2.fkine(panda2.q)
-    
-# Calculate the vector between the two end effectors
-p1 = ee_pose1.t
-p2 = ee_pose2.t
-vector = p2 - p1
-
-midpoint = (p1 + p2) / 2
-    
-#Calculate the distance between end effectors (this will be the rod length)
-distance = np.linalg.norm(vector)
         
 #Create the transformation matrix for the rod
 R = sm.SO3.Ry(-np.pi/2) 
-rod_pose = ee_pose1 * sm.SE3(0,0,0) * sm.SE3(R)
+rod_pose_panda1 = ee_pose1 * sm.SE3(0,0,0) * sm.SE3(R)
 
 # update the rod position based on the current end effector position
 rod = sg.Cylinder(
     radius = rod_radius, 
     length = rod_length, 
-    pose = rod_pose
+    pose = rod_pose_panda1
     )
 rod.color = (0.8, 0, 0)
 env.add(rod)
@@ -87,11 +77,13 @@ env.add(rod)
 # compute the relative transformation of panda1's ee to rod_pose
 # This is used to update the rod's new position relative to its original position 
 # we use .inv() to get the inverse of the matrix ee_pose1
-T_offset_panda1 = ee_pose1.inv() * rod_pose 
+T_offset_panda1 = ee_pose1.inv() * rod_pose_panda1 
 
 # Same idea of the relative transformation but for panda2
-rod_end_pose = rod_pose * sm.SE3(0, 0, rod_length/2)
-T_offset_panda2 = ee_pose2.inv() * rod_end_pose
+# rod_pose_panda2 = rod.T * sm.SE3(0, 0, rod_length/2)
+# T_offset_panda2 = ee_pose2.inv() * rod_pose_panda2
+
+previous_q = panda2.q.copy()
 
 while True:
 
@@ -100,25 +92,23 @@ while True:
     # get current position of end effector 
     ee_pose1 = panda1.fkine(panda1.q)
     ee_pose2 = panda2.fkine(panda2.q)
-    T = sm.SE3(0,0,0)
 
     # apply new position for rod relative to ee of Panda1
     rod.T = ee_pose1 * T_offset_panda1 * sm.SE3(0, 0, -rod_length/4)
 
-    '''
     # compute the position we want the Panda2 robot to be in
-    target_pose = rod.T * sm.SE3(0, 0, rod_length/2)
+    target_pose_panda2 = rod.T * sm.SE3(0, 0, rod_length)
 
     # Calculate using inverse kinematics the joint angles panda2 will have
-    IK_sol = panda2.ikine_LM(target_pose)
+    IK_sol = panda2.ikine_LM(target_pose_panda2, q0=previous_q, mask=[1, 1, 1, 0, 0, 0])
 
-    # apply the joint angles
+    # apply the joint angles, only if they are near previous orientation
+    # this restricts IK for producing different solutions 
     panda2.q = IK_sol.q
-    '''
 
     # Update the environment with the new robot pose
     env.step(0)
-    time.sleep(0.01)    
+    time.sleep(0.05)    
 
 
 
