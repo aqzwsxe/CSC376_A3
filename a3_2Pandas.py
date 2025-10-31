@@ -97,7 +97,7 @@ while True:
     rod.T = ee_pose1 * T_offset_panda1 * sm.SE3(0, 0, -rod_length/4)
 
     # compute the position we want the Panda2 robot to be in
-    target_pose_panda2 = rod.T * sm.SE3(0, 0, rod_length)
+    target_pose_panda2 = rod.T * sm.SE3(0, 0, -rod_length/2)
 
     # Calculate using inverse kinematics the joint angles panda2 will have
     IK_sol = panda2.ikine_LM(target_pose_panda2, q0=previous_q, mask=[1, 1, 1, 0, 0, 0])
@@ -105,6 +105,9 @@ while True:
     # apply the joint angles, only if they are near previous orientation
     # this restricts IK for producing different solutions 
     panda2.q = IK_sol.q
+
+    rod_end_frame = sg.Axes(0.05, pose=target_pose_panda2)
+    env.add(rod_end_frame)
 
     # Update the environment with the new robot pose
     env.step(0)
