@@ -101,21 +101,38 @@ while True:
     target_pose_panda2 = rod.T * sm.SE3(0, 0, -rod_length/2)
 
     # target_pose_panda2 is in world frame. We need to convert it to local frame
-    T_local = panda2.base.inv() * target_pose_panda2
+    #T_local = panda2.base.inv() * target_pose_panda2
+    T_p1_ee_to_rod_center = sm.SE3(rod_length/2, 0, 0)
+    T_rod_center_to_p2_ee_target = sm.SE3(-(rod_length/32), 0, 0) @ sm.SE3.Rz(np.pi)
+    T_rod_W_new = ee_pose1 @ T_p1_ee_to_rod_center
+    T_p2_target = T_rod_W_new @ T_rod_center_to_p2_ee_target
+    
+    T_local = panda2.base.inv() * T_p2_target
+
+    IK_sol = panda2.ikine_LM(
+            T_local,
+            q0=previous_q,
+            mask=[1, 1, 1, 1, 1, 1],
+            ilimit=50,
+            slimit=10,
+        )
+    if IK_sol.success:
+        panda2.q = IK_sol.q
+        previous_q = panda2.q.copy()
 
     # Calculate using inverse kinematics the joint angles panda2 will have
-    IK_sol = panda2.ikine_LM(T_local, q0 = previous_q)
+    #IK_sol = panda2.ikine_LM(T_p2_target, q0 = previous_q, mask=[1, 1, 1, 1, 1, 1], ilimit=50,slimit=10)
 
     # apply the joint angles, only if they are near previous orientation
     # this restricts IK for producing different solutions 
-    panda2.q = IK_sol.q
-    previous_q = panda2.q
+    #panda2.q = IK_sol.q
+    #previous_q = panda2.q.copy()
 
-    rod_end_frame = sg.Axes(0.05, pose=target_pose_panda2)
-    env.add(rod_end_frame)
+    #rod_end_frame = sg.Axes(0.05, pose=target_pose_panda2)
+    #env.add(rod_end_frame)
 
-    panda2_end_frame = sg.Axes(0.05, pose=ee_pose2)
-    env.add(panda2_end_frame)
+    #panda2_end_frame = sg.Axes(0.05, pose=ee_pose2)
+    #env.add(panda2_end_frame)
 
     # Update the environment with the new robot pose
     env.step(0)
