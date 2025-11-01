@@ -25,8 +25,7 @@ panda2.grippers[0].q = [0.01, 0.01]
  
 # Set robot position based on dimensions given in figure 3
 panda1.base = sm.SE3(0.5,0,0) * sm.SE3.Rz(np.pi)
-#panda2.base = sm.SE3(-0.5,-0.1,0)
-panda2.base = sm.SE3(-0.5,0,0)
+panda2.base = sm.SE3(-0.5,-0.1,0)
 
 env.add(panda1)
 env.add(panda2)
