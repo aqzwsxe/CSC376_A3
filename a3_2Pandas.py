@@ -7,6 +7,9 @@ import swift
 import time
 
 # Katherine Qin, Zehao Fan, Oct 2025
+# References: Lecture slides, code from practicals, and other online resources below
+# Inverse kinematics: https://petercorke.github.io/robotics-toolbox-python/IK/ik.html#inverse-kinematics
+# sg.Cylinder: https://www.gitlab.utcluj.ro/rcs/robotics-toolbox-python/-/blob/973f6e73b3e9bb39e59da1205cbf54e29035d2f9/roboticstoolbox/examples/fetch_vision.py
 
 # Launch simulator swift
 env = swift.Swift()
@@ -80,35 +83,33 @@ env.add(rod)
 # we use .inv() to get the inverse of the matrix ee_pose1
 T_offset_panda1 = ee_pose1.inv() * rod_pose_panda1 
 
-# Same idea of the relative transformation but for panda2
-# rod_pose_panda2 = rod.T * sm.SE3(0, 0, rod_length/2)
-# T_offset_panda2 = ee_pose2.inv() * rod_pose_panda2
+# Set grasp offset to indicate the pose of Panda2's grippers relative to the rod
+GRASP_OFFSET = 0.215
 
 previous_q = panda2.q.copy()
 
 while True:
 
-    # Update the rod position based on the end effector current position
-    # Reference: https://petercorke.github.io/robotics-toolbox-python/IK/ik.html#inverse-kinematics
-    # get current position of end effector 
+    # get current position of end effectors
     ee_pose1 = panda1.fkine(panda1.q)
     ee_pose2 = panda2.fkine(panda2.q)
 
     # apply new position for rod relative to ee of Panda1
     rod.T = ee_pose1 * T_offset_panda1 * sm.SE3(0, 0, -rod_length/4)
 
-    # compute the position we want the Panda2 robot to be in
-    target_pose_panda2 = rod.T * sm.SE3(0, 0, -rod_length/2)
-
-    # target_pose_panda2 is in world frame. We need to convert it to local frame
-    #T_local = panda2.base.inv() * target_pose_panda2
+    # find offset from panda1's ee to center of rod
     T_p1_ee_to_rod_center = sm.SE3(rod_length/2, 0, 0)
-    T_rod_center_to_p2_ee_target = sm.SE3(-(rod_length/32), 0, 0) @ sm.SE3.Rz(np.pi)
+
+    # find pose T_p2_target for the desired Panda2 end effector pose
+    # we set Panda2's gripper to grip the very end of the rod and rotate the gripper 180 deg around Z to align with the rod
+    T_rod_center_to_p2_ee_target = sm.SE3(-(rod_length/2 - GRASP_OFFSET), 0, 0) @ sm.SE3.Rz(np.pi)
     T_rod_W_new = ee_pose1 @ T_p1_ee_to_rod_center
     T_p2_target = T_rod_W_new @ T_rod_center_to_p2_ee_target
     
+    # T_p2_target is in world frame. We need to convert it to local frame
     T_local = panda2.base.inv() * T_p2_target
 
+    # compute inverse kinematics 
     IK_sol = panda2.ikine_LM(
             T_local,
             q0=previous_q,
@@ -116,25 +117,13 @@ while True:
             ilimit=50,
             slimit=10,
         )
+    
+    # if IK_sol computes successfully, update joint angles of panda2
     if IK_sol.success:
         panda2.q = IK_sol.q
-        previous_q = panda2.q.copy()
+        previous_q = panda2.q.copy() 
 
-    # Calculate using inverse kinematics the joint angles panda2 will have
-    #IK_sol = panda2.ikine_LM(T_p2_target, q0 = previous_q, mask=[1, 1, 1, 1, 1, 1], ilimit=50,slimit=10)
-
-    # apply the joint angles, only if they are near previous orientation
-    # this restricts IK for producing different solutions 
-    #panda2.q = IK_sol.q
-    #previous_q = panda2.q.copy()
-
-    #rod_end_frame = sg.Axes(0.05, pose=target_pose_panda2)
-    #env.add(rod_end_frame)
-
-    #panda2_end_frame = sg.Axes(0.05, pose=ee_pose2)
-    #env.add(panda2_end_frame)
-
-    # Update the environment with the new robot pose
+    # update the environment with the new robot pose
     env.step(0)
     time.sleep(0.05)    
 
