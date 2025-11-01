@@ -124,7 +124,9 @@ while True:
 
     # update the environment with the new robot pose
     env.step(0)
-    time.sleep(0.05)    
+    time.sleep(0.01)   
+
+    # simulation may slightly lag.
 
 
 
